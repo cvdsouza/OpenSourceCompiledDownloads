@@ -1,0 +1,173 @@
+<style type="text/css">
+	.graph.nav-tabs {
+		margin-bottom: 15px;
+		margin-top: 15px;
+	}
+</style>
+<div class="row">
+	<div class="col-sm-12">
+		<form class="form-inline">
+			<div class="form-group">
+				<input
+					type="text"
+					class="form-control col-sm-2"
+					ng-model="start"
+					placeholder="Start"
+					tooltip
+					title="Can be absolute or relative time. Relative times follow the format <amount><time unit>-ago. Time Units are ms (Millisecond), s (second), m (minute), h (hour), d (day), w (week), n (month), y (year). Absolute time is in the format yyyy/MM/dd-HH:mm:ss , where any of the time (but not date) parts can be omitted."
+					>
+			</div>
+			<div class="form-group">
+				<input
+					type="text"
+					class="form-control col-sm-2"
+					ng-model="end"
+					placeholder="End"
+					tooltip
+					title="Current time if blank. Can be absolute or relative time. Relative times follow the format <amount><time unit>-ago. Time Units are ms (Millisecond), s (second), m (minute), h (hour), d (day), w (week), n (month), y (year). Absolute time is in the format yyyy/MM/dd-HH:mm:ss , where any of the time (but not date) parts can be omitted."
+					>
+			</div>
+			<button class="btn btn-primary" ng-click="Query()">Query</button>
+			<button class="btn btn-default" tooltip title="Switch between absolute and relative time. Switching from absolute to relative time rounds the time." ng-click="SwitchTimes()">Switch Time</button>
+			<div class="checkbox" tooltip title="Auto downsample using avg and the width in pixels of the displayed graph (recommended). Overrides any downsample options from the query below">
+				<label>
+					<input type="checkbox" ng-model="autods"> Auto Downsample
+				</label>
+			</div>
+			<div class="checkbox" tooltip title="Refresh every five seconds">
+				<label>
+					<input type="checkbox" ng-model="refresh"> Auto Refresh
+				</label>
+			</div>
+			<div class="pull-right" ng-show="url">
+				<ts-popup url="url"></ts-popup>
+				<a class="btn btn-default" ng-href="{{url}}&png=.png" target="_blank">image</a>
+			</div>
+		</form>
+	</div>
+</div>
+<div class="row">
+	<div class="col-sm-9">
+		<ul class="graph nav nav-tabs">
+			<li ng-repeat="t in query_p" ng-class="{active: $index == index}"><a href ng-click="setIndex($index)">Query {{$index + 1}}</a></li>
+			<li><a href ng-click="AddTab()">+</a></li>
+		</ul>
+	</div>
+	<div class="col-sm-3">
+		<form class="form-inline">
+			<div class="form-group col-sm-6" tooltip title="Y axis minimum; leave empty for auto.">
+				<label class="control-label">y min</label>
+				<div>
+					<input type="number" class="form-control" style="width: 100%" ng-model="min">
+				</div>
+			</div>
+			<div class="form-group col-sm-6" tooltip title="Y axis maximum; leave empty for auto.">
+				<label class="control-label">y max</label>
+				<div>
+					<input type="number" class="form-control" style="width: 100%" ng-model="max">
+				</div>
+			</div>
+		</form>
+	</div>
+</div>
+<div class="row">
+	<div class="col-sm-12">
+		<div class="tab-content">
+			<div class="tab-pane" ng-class="{active: $index == index}" ng-repeat="t in query_p">
+				<form class="form-horizontal col-sm-4">
+					<div class="form-group">
+						<label class="col-sm-4 control-label">Metric</label>
+						<div class="col-sm-8">
+							<input type="text" class="form-control" ng-model="t.metric" ng-options="m for m in metrics" ng-change="GetTagKByMetric($index)" ng-init="GetTagKByMetric($index)" limit="30" bs-typeahead>
+						</div>
+					</div>
+					<div class="form-group">
+						<label class="col-sm-4 control-label" tooltip title="The method used to combine multiple time series into a single time series. This behavior happens when specific or (*) values are omitted for tags.">Aggregator</label>
+						<div class="col-sm-8">
+							<select class="form-control" ng-model="t.aggregator" ng-options="agg for agg in aggregators"></select>
+						</div>
+					</div>
+					<div class="form-group" ng-hide="autods">
+						<label class="col-sm-4 control-label" tooltip title="Downsample the data into fewer datapoints. Requires that the downsample window value is also provided.">Downsample</label>
+						<div class="col-sm-8">
+							<select ng-model="t.ds" ng-change="t.setDs()" ng-options="agg for agg in dsaggregators" class="form-control"></select>
+						</div>
+					</div>
+					<div class="form-group" ng-hide="autods">
+						<label class="col-sm-4 control-label" tooltip title="The time window to downsample to. For example 1h would return a datapoint for every hour by performing the downsample function over that hour. Time units are ms (millisecond), s (second), m (minute), h (hour), d (day), w (week), n (month), y (year).">Window</label>
+						<div class="col-sm-8">
+							<input type="text" class="form-control" ng-model="t.dstime" ng-change="t.setDs()">
+						</div>
+					</div>
+				</form>
+				<form class="form-horizontal col-sm-4">
+					<div class="form-group" ng-class="{'has-error': !canAuto[t.metric] && t.derivative == 'auto'}">
+						<label class="col-sm-4 control-label" tooltip title="If not set to gauge, this returns a per-second rate of change between points. If the values always increase (except for resets and rollovers), use counter. If the values can go down, use rate. A warning color indicates auto will default to counter.">Series Type</label>
+						<div class="col-sm-8">
+							<select ng-model="t.derivative" ng-change="t.setDerivative()" ng-options="r for r in rate_options" class="form-control"></select>
+						</div>
+					</div>
+					<div class="form-group" ng-show="t.derivative == 'counter'">
+						<label class="col-sm-4 control-label" tooltip title="A positive integer representing the maximum value for the counter.">Counter Max</label>
+						<div class="col-sm-8">
+							<input type="number" class="form-control" ng-model="t.rateOptions.counterMax">
+						</div>
+					</div>
+				</form>
+				<form class="form-horizontal col-sm-4">
+					<div class="form-group" ng-repeat="k in sorted_tagks[$index]">
+						<label class="col-sm-4 control-label" tooltip title="Tag values for the tag. Can have multiple seperate by | which will return a time series for each one. Can also be * which returns a time series for each possible value." ng-bind="k"></label>
+						<div class="col-sm-8">
+							<input type="text" class="form-control" ng-model="t.tags[k]" ng-options="tv for tv in tagvs[$parent.$index][k]" bs-typeahead ng-disabled="!t.metric_tags[k]">
+						</div>
+					</div>
+				</form>
+			</div>
+		</div>
+	</div>
+</div>
+<div class="row" ng-show="running">
+	<div class="col-lg-12">
+		<div class="alert alert-info" ng-bind="running"></div>
+	</div>
+</div>
+<div class="row" ng-show="warning">
+	<div class="col-lg-12">
+		<div class="alert alert-warning" ng-bind="warning"></div>
+	</div>
+</div>
+<div class="row" ng-show="error">
+	<div class="col-lg-12">
+		<div class="alert alert-danger" ng-bind="error"></div>
+	</div>
+</div>
+<div class="row">
+	<div class="col-lg-12">
+		<div id="chart" ts-graph data="result" height="400" bstart="start" bend="end" enable-brush="true" min="min" max="max"></div>
+	</div>
+</div>
+<div class="row" ng-show="queries">
+	<div class="col-lg-12">
+		<h4>Queries</h4>
+		<table class="table">
+			<tbody>
+				<tr ng-repeat="q in queries">
+					<td ng-bind="q"></td>
+					<td><a href="/expr?expr={{btoa(q)}}" target="_blank">Expression</a></td>
+					<td><a href="/rule?expr={{btoa('avg(' + q + ')')}}" target="_blank">Rule</a></td>
+				</tr>
+			</tbody>
+		</table>
+	</div>
+</div>
+<div class="row">
+	<div class="col-lg-12">
+		<h4>Metric Descriptions</h4>
+		<div ng-repeat="(k, v) in meta">
+			<h5>{{k}}</h5>
+			<ul ng-repeat="d in v.Description">
+				<li><span ng-show="d.Tags">{{d.Tags}}: </span>{{d.Text}}</li>
+			</ul>
+		</div>
+	</div>
+</div>

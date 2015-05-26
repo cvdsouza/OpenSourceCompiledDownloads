@@ -1,0 +1,66 @@
+<h1 ng-bind="host"></h1>
+<ul class="nav nav-tabs">
+	<li ng-class="{active: tab == 'stats'}"><a href ng-click="setTab('stats')">Primary Stats</a></li>
+	<li ng-class="{active: tab == 'metrics'}"><a href ng-click="setTab('metrics')">Available Metrics</a></li>
+	<li ng-class="{active: tab == 'metadata'}"><a href ng-click="setTab('metadata')">Metadata</a></li>
+</ul>
+<div class="tab-content">
+	<div class="tab-pane" ng-class="{active: tab == 'stats'}">
+		<div class="row">
+			<div class="col-lg-6">
+				<h4>CPU</h4>
+				<div class="chart" ts-graph data="cpu"></div>
+			</div>
+			<div class="col-lg-6">
+				<h4>Memory <small ng-show="mem_total">Total: {{mem_total | bytes}}</small></h4>
+				<div class="chart" ts-graph data="mem" bytes="true"></div>
+			</div>
+		</div>
+		<div class="row">
+			<div class="col-lg-6" ng-repeat="i in idata">
+				<h4>Network Bit/s: {{i.Name}}</h4>
+				<div class="chart" bytes="true" ts-graph data="i.Data" generator="'area'"></div>
+			</div>
+		</div>
+		<div class="row">
+			<div class="col-lg-6" ng-repeat="fs in fsdata">
+				<h4>Disk Space: {{fs.Name}} <small ng-show="fs.c_val">({{fs.c_val | bytes}} / {{fs.total | bytes}}) {{fs.percent_used | number:0}}% Used</small></h4>
+				<div class="chart" bytes="true" ts-graph data="fs.Data"></div>
+			</div>
+		</div>
+	</div>
+	<div class="tab-pane" ng-class="{active: tab == 'metrics'}">
+		<h1>Metrics</h1>
+		<div class="form-group">
+			<input class="form-control" placeholder="Filter Metrics" ng-model="filterMetrics">
+		</div>
+		<ul>
+			<li ng-repeat="metric in metrics | filter:filterMetrics"><a href="/graph?b64={{btoa(json(mlink(metric)))}}" ng-bind="metric"></a></li>
+		</ul>
+	</div>
+	<div class="tab-pane" ng-class="{active: tab == 'metadata'}">
+		<h1>Metadata</h1>
+		<table class="table">
+			<thead>
+				<tr>
+					<th>Name</th>
+					<th>Tags</th>
+					<th>Value</th>
+				</tr>
+			</thead>
+			<tbody>
+				<tr ng-repeat="data in metadata | orderBy:'Name'">
+					<td ng-bind="data.Name"></td>
+					<td>
+						<ul class="list-unstyled">
+							<li ng-repeat="(k, v) in data.Tags" style="white-space: nowrap">
+								{{k}}: {{v}}
+							</li>
+						</ul>
+					</td>
+					<td ng-bind="data.Value"></td>
+				</tr>
+			</tbody>
+		</table>
+	</div>
+</div>
